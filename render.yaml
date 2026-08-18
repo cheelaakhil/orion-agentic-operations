@@ -15,7 +15,7 @@ services:
       - key: ORION_AGENT_PROVIDER
         value: local
       - key: ORION_CORS_ORIGINS
-        value: "https://*.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
+        value: "https://orion-agentic-operations-4jim19l0i-cheela-akhils-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
       - key: DATABASE_URL
         fromDatabase:
           name: orion-postgres

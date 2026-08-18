@@ -26,12 +26,13 @@ class Settings(BaseSettings):
 
     # CORS Origins (accepts list or comma-separated string)
     cors_origins: Union[list[str], str] = [
+        "https://orion-agentic-operations-4jim19l0i-cheela-akhils-projects.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
-        "https://*.vercel.app",
     ]
+    cors_origin_regex: str = r"^https:\/\/.*\.vercel\.app$"
 
     # Agent Provider
     agent_provider: str = "local"  # "local" | "adya" (adapter-ready)

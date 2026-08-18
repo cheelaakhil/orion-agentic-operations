@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Caches and tests
+.pytest_cache/
+.coverage
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.env
+.env.local
+.env.*.local
+venv/
+env/
+ENV/
+.venv/
+
+# Database & artifacts
+*.sqlite3
+*.db-journal
+scratch/
+*.log
+
+# Node & Next.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.next/
+out/
+build/
+dist/
+
+# OS metadata
+.DS_Store
+Thumbs.db

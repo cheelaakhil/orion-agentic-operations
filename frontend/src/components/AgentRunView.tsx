@@ -435,48 +435,74 @@ export function AgentRunView({
         <div className="space-y-6">
           {/* Human Governance Approval Banner */}
           {trace.status === "WAITING_FOR_APPROVAL" && (
-            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/90 to-amber-950/40 border-2 border-amber-500/50 rounded-xl p-6 shadow-xl relative overflow-hidden">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                <div className="space-y-3 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 bg-amber-500/20 border border-amber-500/40 rounded text-amber-300 font-mono text-[11px] font-bold flex items-center gap-1.5">
+            <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-amber-950/60 border-2 border-amber-500/80 rounded-2xl p-6 sm:p-8 shadow-2xl relative overflow-hidden ring-4 ring-amber-500/10">
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                <div className="space-y-4 flex-1">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <span className="px-3 py-1 bg-amber-500/20 border border-amber-400/50 rounded-full text-amber-300 font-mono text-xs font-bold flex items-center gap-1.5 animate-pulse shadow-sm">
                       <Lock className="w-3.5 h-3.5" /> MANDATORY HUMAN GOVERNANCE GATE
                     </span>
-                    <span className="text-slate-400 text-xs">Request ID: <code className="text-amber-200">{trace.approval_request_id || "APPR-REC-001"}</code></span>
+                    <span className="text-slate-400 text-xs font-mono">
+                      Token Request: <code className="text-amber-200 font-bold">{trace.approval_request_id || "APPR-REC-001"}</code>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[11px] font-mono">
+                      Risk Tier: <strong className="text-amber-300 font-bold">{trace.scores?.action_risk || "MEDIUM"}</strong>
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-emerald-950/60 text-emerald-300 border border-emerald-800/60 text-[11px] font-mono">
+                      Reversible: Yes
+                    </span>
                   </div>
 
-                  <h3 className="text-lg font-bold text-white">
-                    Authorization Required: {trace.governance_details?.action || "Support Team Capacity Escalation"}
-                  </h3>
+                  <div>
+                    <h3 className="text-xl font-extrabold text-white tracking-tight">
+                      Action Approval Required: {trace.governance_details?.action || "Support Team Capacity Escalation"}
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-1">
+                      The autonomous agent pipeline has formulated an operational remediation and paused for explicit executive authorization.
+                    </p>
+                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-                      <span className="text-slate-400 font-medium block mb-1">Expected Benefit:</span>
-                      <p className="text-emerald-300">{trace.governance_details?.expected_benefit || "Reduces resolution latency from 26.5h to <4.0h and mitigates forward churn risk."}</p>
+                    <div className="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3.5 space-y-1">
+                      <span className="text-slate-400 font-semibold flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> Projected Operational Benefit
+                      </span>
+                      <p className="text-emerald-300 leading-relaxed font-medium">
+                        {trace.governance_details?.expected_benefit || "Reduces resolution latency from 26.5h to <4.0h, eliminating the backlog within 48h and mitigating forward churn."}
+                      </p>
                     </div>
-                    <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
-                      <span className="text-slate-400 font-medium block mb-1">Governance Threshold:</span>
-                      <p className="text-amber-300">{trace.governance_details?.why_approval_required || "Operational capacity shift exceeds automated threshold."}</p>
+
+                    <div className="bg-slate-950/80 border border-slate-800/90 rounded-xl p-3.5 space-y-1">
+                      <span className="text-slate-400 font-semibold flex items-center gap-1.5 text-[11px] uppercase tracking-wider">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-400" /> Governance Policy Rationale
+                      </span>
+                      <p className="text-amber-200 leading-relaxed font-medium">
+                        {trace.governance_details?.why_approval_required || "Operational capacity shift exceeds autonomous threshold. Executive approval required before execution."}
+                      </p>
                     </div>
                   </div>
 
-                  <p className="text-slate-400 text-xs">
-                    <strong className="text-slate-300">Safety Guarantee:</strong> Consequential actions fail closed. No changes are applied until an authorized executive approves. Execution occurs strictly in <span className="text-cyan-300 font-mono">SIMULATED ACTION</span> mode.
-                  </p>
+                  <div className="p-3 rounded-xl bg-slate-950/90 border border-slate-800 text-xs space-y-1">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <ShieldCheck className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                      <span className="font-semibold text-white">Fail-Closed Safety Contract:</span>
+                      <span className="text-slate-400">All consequential tools are strictly blocked without an authorized token. Execution runs in sandbox simulation.</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-row md:flex-col gap-3 min-w-[200px]">
+                <div className="flex flex-row lg:flex-col gap-3 min-w-[220px] justify-center flex-shrink-0">
                   <button
                     onClick={() => onApprove(trace.active_recommendation_id || "REC-001")}
                     disabled={isProcessing}
-                    className="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+                    className="flex-1 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <CheckCircle2 className="w-4 h-4" /> Approve & Execute Simulation
                   </button>
                   <button
                     onClick={() => onReject(trace.active_recommendation_id || "REC-001")}
                     disabled={isProcessing}
-                    className="flex-1 px-5 py-2.5 bg-slate-800 hover:bg-rose-900/50 hover:border-rose-700 disabled:opacity-50 text-slate-300 hover:text-rose-200 border border-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-slate-800 hover:bg-rose-950/60 hover:border-rose-700/80 disabled:opacity-50 text-slate-300 hover:text-rose-200 border border-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
                   >
                     <XCircle className="w-4 h-4" /> Reject Proposal
                   </button>
@@ -487,17 +513,24 @@ export function AgentRunView({
 
           {/* Simulation Success Banner */}
           {trace.status === "COMPLETED" && trace.simulation_result && (
-            <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-5 text-xs text-slate-300 space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="font-bold text-emerald-400 flex items-center gap-2 text-sm">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Operational Simulation Complete: {trace.simulation_result.execution_mode || "SIMULATED ACTION"}
-                </h4>
-                <span className="font-mono text-emerald-300 text-[11px]">Execution ID: {trace.simulation_result.execution_id}</span>
+            <div className="bg-gradient-to-r from-emerald-950/50 via-slate-900 to-emerald-950/50 border-2 border-emerald-500/60 rounded-2xl p-6 text-xs text-slate-300 space-y-3 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-mono text-[11px] font-bold">
+                    SIMULATED ACTION — SAFE SANDBOX
+                  </span>
+                  <span className="text-emerald-400 font-bold text-sm">Execution Completed Successfully</span>
+                </div>
+                <span className="font-mono text-emerald-300 text-xs bg-slate-950 px-2.5 py-1 rounded border border-slate-800">
+                  Execution ID: {trace.simulation_result.execution_id}
+                </span>
               </div>
-              <p className="text-slate-300">
-                Applied <strong className="text-white">{trace.simulation_result.result?.changes_made?.length || 3} simulated adjustments</strong> (+15 specialists allocated, throughput 42 → 128 tickets/hr). Full audit record committed to immutable ledger.
+              <p className="text-slate-200 text-xs leading-relaxed">
+                Applied <strong className="text-white font-bold">{trace.simulation_result.result?.changes_made?.length || 3} simulated adjustments</strong> (+15 tier-2 support specialists allocated, triage throughput increased from 42 → 128 tickets/hr). Cryptographic audit record committed to immutable PostgreSQL ledger.
               </p>
+              <div className="text-[11px] text-slate-400 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/80 font-mono">
+                Notice: Sandbox simulation only. Never modifies live external production accounts or billing.
+              </div>
             </div>
           )}
 
@@ -614,32 +647,58 @@ export function AgentRunView({
 
           {/* Decision Trace Timeline */}
           <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
-            <div>
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-cyan-400" />
-                Causal Decision Progression
-              </h3>
-              <p className="text-slate-400 text-xs">
-                Transparent step-by-step reasoning chain linking observed SQL anomalies directly to human governance and simulation.
-              </p>
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-white flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-cyan-400" />
+                    Causal Decision Progression
+                  </h3>
+                  <p className="text-slate-400 text-xs">
+                    Transparent step-by-step reasoning chain linking observed SQL anomalies directly to human governance and simulation.
+                  </p>
+                </div>
+                <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 px-2.5 py-1 rounded border border-cyan-800/80 font-semibold">
+                  8-Stage Causal Flow
+                </span>
+              </div>
+
+              {/* Horizontal Causal Breadcrumb */}
+              <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-300 bg-slate-950/80 border border-slate-800/90 px-3.5 py-2 rounded-xl flex-wrap">
+                <span className="text-rose-400 font-bold">Anomaly</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-blue-400 font-bold">Evidence</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-cyan-400 font-bold">Root Cause</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-indigo-400 font-bold">Impact</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-purple-400 font-bold">Recommendation</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-amber-400 font-bold">Human Approval</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-emerald-400 font-bold">Execution</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-teal-400 font-bold">Audit</span>
+              </div>
             </div>
 
             <div className="space-y-4 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
               {(trace.decision_trace || []).map((item, idx) => (
                 <div key={idx} className="relative pl-10">
-                  <div className="absolute left-2.5 -translate-x-1/2 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-900 border-2 border-cyan-500" />
-                  <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-4 space-y-1">
+                  <div className="absolute left-2.5 -translate-x-1/2 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-900 border-2 border-cyan-500 shadow-sm" />
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-1.5 hover:border-slate-700 transition-colors">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono text-cyan-400 uppercase font-bold tracking-wider">
-                        {item.stage}
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800/80 uppercase font-bold tracking-wider">
+                        Stage {idx + 1}: {item.stage}
                       </span>
                       {item.confidence_score && (
-                        <span className="text-[11px] font-mono text-slate-400">
+                        <span className="text-[11px] font-mono text-emerald-400 font-semibold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
                           Confidence: {(item.confidence_score * 100).toFixed(0)}%
                         </span>
                       )}
                     </div>
-                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
+                    <h4 className="text-sm font-bold text-white">{item.title}</h4>
                     <p className="text-xs text-slate-300 leading-relaxed">{item.summary}</p>
                   </div>
                 </div>

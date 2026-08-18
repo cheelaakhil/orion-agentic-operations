@@ -15,16 +15,19 @@ import {
   ExternalLink,
   FileCheck,
   FileSearch,
+  Layers,
   Lock,
   Play,
   RefreshCw,
   Scale,
+  Search,
   Shield,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
   Terminal,
   UserCheck,
+  Wrench,
   XCircle,
   Zap,
 } from "lucide-react";
@@ -39,6 +42,135 @@ interface AgentRunViewProps {
   isProcessing: boolean;
 }
 
+const MCP_TOOLS_CATALOG = [
+  {
+    name: "get_business_anomalies",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Scans operations data to detect statistical outliers across revenue, support, inventory, and marketing.",
+  },
+  {
+    name: "get_anomaly_evidence",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Retrieves multi-dimensional factual evidence package for a detected anomaly.",
+  },
+  {
+    name: "get_revenue_analytics",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Calculates revenue KPIs, daily timeseries trends, and pre/post incident performance.",
+  },
+  {
+    name: "get_revenue_by_product",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Breaks down sales performance by product category to identify isolated drops.",
+  },
+  {
+    name: "get_revenue_by_region",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Provides geographic distribution of sales and conversion rates.",
+  },
+  {
+    name: "get_customer_analytics",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Analyzes repeat purchase behavior, customer cohorts, and churn rates.",
+  },
+  {
+    name: "get_support_analytics",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Computes support queue volume, resolution times, SLA breaches, and CSAT.",
+  },
+  {
+    name: "get_inventory_analytics",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Evaluates warehouse stock levels, stockout rates by category, and replenishment lead times.",
+  },
+  {
+    name: "get_marketing_analytics",
+    category: "Deterministic Analytics",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Quantifies ad spend, CTR, conversion rates, and ROAS across marketing campaigns.",
+  },
+  {
+    name: "start_investigation",
+    category: "Multi-Agent Investigation",
+    safety: "ANALYSIS",
+    requiresApproval: false,
+    description: "Initiates autonomous multi-agent causal investigation pipeline over an anomaly.",
+  },
+  {
+    name: "get_investigation",
+    category: "Multi-Agent Investigation",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Retrieves ranked causal hypotheses with confidence scores and supporting evidence.",
+  },
+  {
+    name: "calculate_business_impact",
+    category: "Business Impact Modeling",
+    safety: "ANALYSIS",
+    requiresApproval: false,
+    description: "Calculates deterministic cumulative financial loss, daily burn rate, and counterfactual recovery.",
+  },
+  {
+    name: "get_recommendations",
+    category: "Action Recommendations",
+    safety: "PROPOSAL",
+    requiresApproval: false,
+    description: "Retrieves prioritized, actionable operational remediations with projected ROI.",
+  },
+  {
+    name: "request_approval",
+    category: "Governance Gate",
+    safety: "PROPOSAL",
+    requiresApproval: false,
+    description: "Submits a recommendation to the human executive approval queue and returns an approval request ID.",
+  },
+  {
+    name: "approve_recommendation",
+    category: "Governance Gate",
+    safety: "APPROVAL",
+    requiresApproval: false,
+    description: "Records human executive approval in the database registry and issues an authorization token.",
+  },
+  {
+    name: "reject_recommendation",
+    category: "Governance Gate",
+    safety: "APPROVAL",
+    requiresApproval: false,
+    description: "Records human executive rejection, permanently blocking action execution.",
+  },
+  {
+    name: "execute_approved_action",
+    category: "Safe Action Simulation",
+    safety: "CONSEQUENT_ACTION",
+    requiresApproval: true,
+    description: "Verifies authorization token and executes safe domain action simulation with rollback tracking.",
+  },
+  {
+    name: "get_audit_events",
+    category: "Audit & Compliance",
+    safety: "READ_ONLY",
+    requiresApproval: false,
+    description: "Queries the tamper-evident operations audit trail for compliance and post-mortem analysis.",
+  },
+];
+
 export function AgentRunView({
   trace,
   isLoading,
@@ -48,6 +180,8 @@ export function AgentRunView({
   onReject,
   isProcessing,
 }: AgentRunViewProps) {
+  const [activeSubView, setActiveSubView] = useState<"trace" | "mcp_catalog">("trace");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedStep, setSelectedStep] = useState<AgentTraceStep | null>(null);
 
   if (isLoading && !trace) {
@@ -83,7 +217,7 @@ export function AgentRunView({
   const isCompleted = trace.status === "COMPLETED";
   const isRejected = trace.status === "REJECTED";
 
-  // Nodes for visualization pipeline
+  // Visual workflow pipeline sequence
   const workflowNodes = [
     { id: "detect", label: "DETECT", agent: "Supervisor", tool: "get_business_anomalies", step: 1 },
     { id: "evidence", label: "EVIDENCE", agent: "Data Analyst", tool: "get_anomaly_evidence", step: 2 },
@@ -126,6 +260,7 @@ export function AgentRunView({
         return "bg-purple-500/10 text-purple-400 border-purple-500/30";
       case "APPROVAL":
         return "bg-amber-500/10 text-amber-400 border-amber-500/30";
+      case "CONSEQUENT_ACTION":
       case "CONSEQUENTIAL_ACTION":
         return "bg-rose-500/10 text-rose-400 border-rose-500/30";
       default:
@@ -149,6 +284,12 @@ export function AgentRunView({
         return "bg-slate-800 text-slate-300 border-slate-700";
     }
   };
+
+  const categories = ["ALL", "Deterministic Analytics", "Multi-Agent Investigation", "Business Impact Modeling", "Action Recommendations", "Governance Gate", "Safe Action Simulation", "Audit & Compliance"];
+
+  const filteredTools = selectedCategory === "ALL"
+    ? MCP_TOOLS_CATALOG
+    : MCP_TOOLS_CATALOG.filter((t) => t.category === selectedCategory);
 
   return (
     <div className="space-y-6">
@@ -180,7 +321,7 @@ export function AgentRunView({
               Autonomous Investigation on <span className="text-blue-400 font-mono">{trace.anomaly_id}</span>
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Deterministic multi-agent execution pipeline orchestrating 18 verified ORION MCP business tools.
+              End-to-end multi-agent operations pipeline orchestrating 18 verified ORION MCP tools with human governance.
             </p>
           </div>
 
@@ -209,7 +350,7 @@ export function AgentRunView({
       <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-5 shadow-lg">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
           <Activity className="w-4 h-4 text-blue-400" />
-          Autonomous Agent Capability Graph
+          Autonomous Agent Capability Graph (9-Stage Sequence)
         </h2>
         <div className="overflow-x-auto pb-2">
           <div className="flex items-center min-w-[760px] justify-between">
@@ -348,71 +489,168 @@ export function AgentRunView({
         </div>
       )}
 
-      {/* 5. Live Agent Execution Trace (Detailed Step Logs) */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold text-white flex items-center gap-2">
-            <Terminal className="w-4 h-4 text-blue-400" />
-            Structured Agent Execution Trace ({trace.steps.length} Steps)
-          </h2>
-          <span className="text-xs text-slate-400 font-mono">
-            Provider: ORION LocalAgentRuntime (MCP-First)
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {trace.steps.map((step) => (
-            <div
-              key={step.step_id}
-              onClick={() => setSelectedStep(step)}
-              className="bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 rounded-lg p-4 transition cursor-pointer"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-md bg-slate-800 text-slate-300 text-xs font-mono font-bold flex items-center justify-center">
-                    {step.step_id}
-                  </span>
-                  <span className="text-xs font-bold text-white">{step.agent_role}</span>
-                  <ArrowRight className="w-3 h-3 text-slate-600" />
-                  <span className="text-xs font-mono text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/40">
-                    {step.tool_called}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSafetyBadgeColor(step.tool_safety)}`}>
-                    {step.tool_safety}
-                  </span>
-                  {step.evidence_type && (
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getEvidenceBadgeColor(step.evidence_type)}`}>
-                      {step.evidence_type}
-                    </span>
-                  )}
-                  <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {step.duration_ms}ms
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                    Input Summary
-                  </span>
-                  <p className="text-slate-300 text-xs">{step.input_summary}</p>
-                </div>
-                <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
-                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                    Output Summary
-                  </span>
-                  <p className="text-slate-200 text-xs">{step.output_summary}</p>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* 5. Sub-View Switcher: Trace vs MCP Tools Catalog */}
+      <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+        <button
+          onClick={() => setActiveSubView("trace")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+            activeSubView === "trace"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+              : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <Terminal className="w-3.5 h-3.5" />
+          Agent Execution Trace ({trace.steps.length} Steps)
+        </button>
+        <button
+          onClick={() => setActiveSubView("mcp_catalog")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+            activeSubView === "mcp_catalog"
+              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
+              : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+          }`}
+        >
+          <Wrench className="w-3.5 h-3.5 text-cyan-400" />
+          18 MCP Tools Explorer (5 Safety Tiers)
+        </button>
       </div>
+
+      {/* 6A. Sub-View: Trace Logs */}
+      {activeSubView === "trace" && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold text-white flex items-center gap-2">
+              <Terminal className="w-4 h-4 text-blue-400" />
+              Structured Agent Execution Trace ({trace.steps.length} Steps)
+            </h2>
+            <span className="text-xs text-slate-400 font-mono">
+              Provider: ORION LocalAgentRuntime (MCP-First)
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {trace.steps.map((step) => (
+              <div
+                key={step.step_id}
+                onClick={() => setSelectedStep(step)}
+                className="bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 rounded-lg p-4 transition cursor-pointer"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-md bg-slate-800 text-slate-300 text-xs font-mono font-bold flex items-center justify-center">
+                      {step.step_id}
+                    </span>
+                    <span className="text-xs font-bold text-white">{step.agent_role}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-600" />
+                    <span className="text-xs font-mono text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/40">
+                      {step.tool_called}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSafetyBadgeColor(step.tool_safety)}`}>
+                      {step.tool_safety}
+                    </span>
+                    {step.evidence_type && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getEvidenceBadgeColor(step.evidence_type)}`}>
+                        {step.evidence_type}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {step.duration_ms}ms
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
+                  <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                      Input Summary
+                    </span>
+                    <p className="text-slate-300 text-xs">{step.input_summary}</p>
+                  </div>
+                  <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+                      Output Summary
+                    </span>
+                    <p className="text-slate-200 text-xs">{step.output_summary}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 6B. Sub-View: MCP Tools Catalog Explorer */}
+      {activeSubView === "mcp_catalog" && (
+        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                <Wrench className="w-4 h-4 text-cyan-400" />
+                ORION FastMCP Tools Catalog (18 Operational Tools)
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Exposes deterministic analytics, investigation, governance, and simulation to any MCP-compliant runtime.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs font-mono bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+              <span className="text-slate-400">Server:</span>
+              <span className="text-cyan-400">orion_mcp/server.py</span>
+            </div>
+          </div>
+
+          {/* Category Filter Pills */}
+          <div className="flex flex-wrap gap-2 pt-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1 rounded-md text-[11px] font-medium transition ${
+                  selectedCategory === cat
+                    ? "bg-cyan-950 text-cyan-300 border border-cyan-700"
+                    : "bg-slate-950/80 text-slate-400 hover:text-slate-200 border border-slate-800"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Tools Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            {filteredTools.map((tool) => (
+              <div
+                key={tool.name}
+                className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between hover:border-slate-700 transition"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="font-mono text-xs font-bold text-cyan-300">{tool.name}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSafetyBadgeColor(tool.safety)}`}>
+                      {tool.safety}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">{tool.description}</p>
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-3 mt-2 border-t border-slate-900">
+                  <span className="text-slate-500">{tool.category}</span>
+                  {tool.requiresApproval ? (
+                    <span className="text-amber-400 font-semibold flex items-center gap-1">
+                      <Lock className="w-3 h-3" />
+                      Human Approval Required
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Autonomous Authorized</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

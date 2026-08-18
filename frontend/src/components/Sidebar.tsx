@@ -132,6 +132,20 @@ export function Sidebar({
         })}
       </nav>
 
+      {/* Adya Integration Status Indicator */}
+      <div className="px-3 py-2 border-t border-slate-800/60 bg-slate-950/20">
+        <div className="flex flex-col gap-1 p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80">
+          <div className="flex items-center justify-between text-[10px] font-mono">
+            <span className="text-slate-400">Runtime:</span>
+            <span className="text-cyan-400 font-medium">LocalAgentRuntime</span>
+          </div>
+          <div className="flex items-center justify-between text-[10px] font-mono">
+            <span className="text-slate-400">Adya AI:</span>
+            <span className="text-amber-400 font-semibold">ADAPTER-READY ONLY</span>
+          </div>
+        </div>
+      </div>
+
       {/* Executive Footer */}
       <div className="p-4 border-t border-slate-800/80 bg-slate-950/40">
         <div className="flex items-center gap-3">

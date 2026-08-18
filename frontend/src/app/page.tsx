@@ -307,19 +307,23 @@ export default function DashboardPage() {
         />
 
         <main className="flex-1 p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
-          {/* Error Banner with Retry */}
+          {/* Backend Connection / Cold-Start Notice Banner */}
           {error && (
-            <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 flex items-center justify-between">
+            <div className="p-4 rounded-xl bg-amber-950/50 border border-amber-800/80 text-amber-200 flex flex-wrap items-center justify-between gap-3 shadow-lg">
               <div className="flex items-center gap-3 text-xs">
-                <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                <span>Backend Connection Notice: {error}</span>
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <div>
+                  <span className="font-semibold text-amber-300">Backend Connection Notice: </span>
+                  <span className="text-slate-300">Connecting to Render Cloud Backend. (Render Free web services spin up in 30–45s after inactivity).</span>
+                </div>
               </div>
               <button
                 onClick={loadData}
-                className="px-3 py-1 rounded bg-rose-900 hover:bg-rose-800 text-rose-100 text-xs font-mono font-medium flex items-center gap-1.5"
+                disabled={isLoading}
+                className="px-3.5 py-1.5 rounded-lg bg-amber-900/90 hover:bg-amber-800 text-amber-100 text-xs font-mono font-medium flex items-center gap-1.5 transition disabled:opacity-50"
               >
-                <RefreshCw className="w-3 h-3" />
-                <span>Retry</span>
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-amber-300" : ""}`} />
+                <span>{isLoading ? "Connecting..." : "Retry Connection"}</span>
               </button>
             </div>
           )}

@@ -164,5 +164,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ recommendation_id: recommendationId, rejector, reason }),
     }),
+
+  // MCP Tools & Runtime Info
+  getRuntimeInfo: () => fetcher<any>("/agent-run/runtime-info"),
+  getMcpTools: () => fetcher<{ tools: any[]; count: number }>("/agent-run/mcp-tools"),
 };
 

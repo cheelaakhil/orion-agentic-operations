@@ -100,13 +100,19 @@ LAST_NAMES = [
 
 def get_engine_and_session(db_url: str | None = None):
     """Create synchronous engine and session maker."""
-    url = db_url or os.getenv("ORION_DATABASE_URL", settings.database_url)
-    if url.startswith("postgresql+asyncpg://"):
+    url = db_url or os.getenv("DATABASE_URL") or os.getenv("ORION_DATABASE_URL", settings.database_url)
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+    elif url.startswith("postgresql+asyncpg://"):
         url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
     elif url.startswith("sqlite+aiosqlite://"):
         url = url.replace("sqlite+aiosqlite://", "sqlite://", 1)
 
-    engine = create_engine(url, echo=False)
+    connect_args = {}
+    if url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False}
+
+    engine = create_engine(url, connect_args=connect_args, echo=False)
     SessionLocal = sessionmaker(bind=engine)
     return engine, SessionLocal
 

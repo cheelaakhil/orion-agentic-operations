@@ -212,7 +212,18 @@ python -m pytest backend/tests -v
 
 ---
 
+## Deployment Modes & Architecture
+
+| Mode | Frontend | Backend API | Database | Target Use Case |
+|---|---|---|---|---|
+| **Local Development** | `localhost:3000` (Next.js dev/start) | `127.0.0.1:8000` (Uvicorn) | SQLite / Local Postgres | Local evaluation & development |
+| **Public Demo** *(Current)* | **Vercel** (`*.vercel.app`) | **Render Web Service** (`*.onrender.com`) | Managed PostgreSQL (Render/Neon) | Interactive public web demonstration |
+| **Production Enterprise** | Enterprise Edge / CDN | Dedicated Kubernetes / Cloud Run | HA Managed PostgreSQL Cluster | Live multi-tenant operational deployment |
+
+For step-by-step public demo deployment instructions, refer to the [Deployment Runbook](docs/DEPLOYMENT.md), [Deployment Plan](docs/DEPLOYMENT_PLAN.md), and [Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md).
+
+---
+
 ## License
 
 Proprietary — Internal use only.
-

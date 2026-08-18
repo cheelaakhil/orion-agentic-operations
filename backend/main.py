@@ -90,5 +90,5 @@ def health_check():
     return {
         "status": "healthy",
         "service": "orion-backend",
-        "version": "0.2.0",
+        "version": settings.app_version,
     }

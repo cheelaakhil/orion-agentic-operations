@@ -15,16 +15,18 @@ from backend.core.config import settings
 
 # Determine sync database URL
 def get_sync_url() -> str:
-    url = os.getenv("ORION_DATABASE_URL")
+    url = os.getenv("DATABASE_URL") or os.getenv("ORION_DATABASE_URL")
     if not url:
-        # Default to local verified sqlite db if available
+        # Default to local verified sqlite db if available for offline dev
         if os.path.exists("orion_verified.db"):
             return "sqlite:///orion_verified.db"
         elif os.path.exists("orion.db"):
             return "sqlite:///orion.db"
         url = settings.database_url
 
-    if url.startswith("postgresql+asyncpg://"):
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+    elif url.startswith("postgresql+asyncpg://"):
         return url.replace("postgresql+asyncpg://", "postgresql://", 1)
     elif url.startswith("sqlite+aiosqlite://"):
         return url.replace("sqlite+aiosqlite://", "sqlite://", 1)

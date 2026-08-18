@@ -7,7 +7,20 @@ import {
   Recommendation,
 } from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+function getApiBaseUrl(): string {
+  const rawBase =
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://127.0.0.1:8000/api/v1";
+
+  const trimmed = rawBase.trim().replace(/\/+$/, "");
+  if (!trimmed.endsWith("/api/v1")) {
+    return `${trimmed}/api/v1`;
+  }
+  return trimmed;
+}
+
+const API_BASE = getApiBaseUrl();
 
 async function fetcher<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE}${endpoint}`;

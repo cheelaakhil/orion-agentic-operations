@@ -47,8 +47,11 @@ def execute_approved_action(
     """
     if not approval_id:
         return {
+            "allowed": False,
             "status": "error",
             "error": "EXECUTION_DENIED: approval_id is required. No consequential action may execute without human authorization.",
+            "reason": "Human approval required",
+            "required_gate": "APPROVAL",
         }
 
     db = SessionLocal()
@@ -59,14 +62,20 @@ def execute_approved_action(
         )
         if not approval:
             return {
+                "allowed": False,
                 "status": "error",
                 "error": f"EXECUTION_DENIED: Approval token '{approval_id}' does not exist.",
+                "reason": "Invalid or missing approval token",
+                "required_gate": "APPROVAL",
             }
 
         if approval.status != "APPROVED":
             return {
+                "allowed": False,
                 "status": "error",
                 "error": f"EXECUTION_DENIED: Action is not approved. Current approval status: '{approval.status}'.",
+                "reason": "Action requires approved status",
+                "required_gate": "APPROVAL",
             }
 
         # 2. Check recommendation status
@@ -76,8 +85,11 @@ def execute_approved_action(
             )
             if rec and rec.approval_status == "REJECTED":
                 return {
+                    "allowed": False,
                     "status": "error",
                     "error": "EXECUTION_DENIED: Associated recommendation was explicitly REJECTED by human operator.",
+                    "reason": "Recommendation was rejected by operator",
+                    "required_gate": "APPROVAL",
                 }
 
         # 3. Check for duplicate execution after approval decision
@@ -91,8 +103,11 @@ def execute_approved_action(
             )
             if existing_exec:
                 return {
+                    "allowed": False,
                     "status": "error",
                     "error": f"EXECUTION_DENIED: Action for approval '{approval_id}' was already executed (Execution ID: {existing_exec.execution_id}).",
+                    "reason": "Action already executed",
+                    "required_gate": "APPROVAL",
                 }
 
         # 4. Map action type

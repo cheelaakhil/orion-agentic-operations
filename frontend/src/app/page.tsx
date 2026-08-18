@@ -401,7 +401,7 @@ export default function DashboardPage() {
               trace={agentRunTrace}
               isLoading={isLoading}
               onRefresh={loadData}
-              onStartNewRun={() => handleStartAgentRun("ANOM-REV-001")}
+              onStartNewRun={(anomalyId) => handleStartAgentRun(anomalyId || "ANOM-REV-001")}
               onApprove={handleApproveAgentRun}
               onReject={handleRejectAgentRun}
               isProcessing={!!isProcessingId}

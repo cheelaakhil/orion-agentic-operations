@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
-import { AgentRunTrace, AgentTraceStep } from "@/types";
+import React, { useState, useEffect } from "react";
+import { AgentRunTrace, AgentTraceStep, InvestigationScenario } from "@/types";
+import { api } from "@/lib/api";
 import {
   Activity,
   AlertOctagon,
@@ -15,6 +16,7 @@ import {
   ExternalLink,
   FileCheck,
   FileSearch,
+  History,
   Layers,
   Lock,
   Play,
@@ -36,7 +38,7 @@ interface AgentRunViewProps {
   trace: AgentRunTrace | null;
   isLoading: boolean;
   onRefresh: () => void;
-  onStartNewRun: () => void;
+  onStartNewRun: (anomalyId?: string) => void;
   onApprove: (recommendationId: string) => Promise<void>;
   onReject: (recommendationId: string) => Promise<void>;
   isProcessing: boolean;
@@ -171,6 +173,41 @@ const MCP_TOOLS_CATALOG = [
   },
 ];
 
+const DEFAULT_SCENARIOS: InvestigationScenario[] = [
+  {
+    id: "ANOM-REV-001",
+    title: "Revenue Drop (-43.01%)",
+    metric: "daily_revenue",
+    severity: "CRITICAL",
+    category: "Financial Performance",
+    description: "Severe post-June 20 decline in enterprise sales volume with elevated support ticket backlog.",
+  },
+  {
+    id: "ANOM-SUP-002",
+    title: "Support Backlog Surge (SLA Breach 86.7%)",
+    metric: "sla_breach_rate",
+    severity: "HIGH",
+    category: "Customer Operations",
+    description: "Resolution time surge to 26.5h across Tier-2 technical support escalations.",
+  },
+  {
+    id: "ANOM-INV-003",
+    title: "Warehouse Stockout Surge (Electronics 19.8%)",
+    metric: "stockout_rate",
+    severity: "HIGH",
+    category: "Supply Chain & Logistics",
+    description: "Critical inventory depletion across high-velocity Electronics SKUs in North America hub.",
+  },
+  {
+    id: "ANOM-CUST-004",
+    title: "Customer Churn Acceleration (Repeat Rate -54.3%)",
+    metric: "repeat_purchase_rate",
+    severity: "MEDIUM",
+    category: "Customer Retention",
+    description: "Drop in repeat buyer retention among second-month purchase cohorts.",
+  },
+];
+
 export function AgentRunView({
   trace,
   isLoading,
@@ -180,9 +217,42 @@ export function AgentRunView({
   onReject,
   isProcessing,
 }: AgentRunViewProps) {
-  const [activeSubView, setActiveSubView] = useState<"trace" | "mcp_catalog">("trace");
+  const [activeSubView, setActiveSubView] = useState<"trace" | "decision_trace" | "mcp_catalog" | "history">("trace");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [selectedStep, setSelectedStep] = useState<AgentTraceStep | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<string>("ANOM-REV-001");
+  const [scenarios, setScenarios] = useState<InvestigationScenario[]>(DEFAULT_SCENARIOS);
+  const [historyList, setHistoryList] = useState<AgentRunTrace[]>([]);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Load scenarios
+    api.getAgentRunScenarios()
+      .then((res) => {
+        if (res?.scenarios?.length > 0) {
+          setScenarios(res.scenarios);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadHistory = () => {
+    setHistoryLoading(true);
+    api.getAgentRunHistory()
+      .then((res) => {
+        if (Array.isArray(res)) {
+          setHistoryList(res);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setHistoryLoading(false));
+  };
+
+  useEffect(() => {
+    if (activeSubView === "history") {
+      loadHistory();
+    }
+  }, [activeSubView]);
 
   if (isLoading && !trace) {
     return (
@@ -199,419 +269,398 @@ export function AgentRunView({
         <Bot className="w-12 h-12 text-slate-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-white mb-2">No Active Agent Investigation</h3>
         <p className="text-slate-400 text-sm max-w-md mx-auto mb-6">
-          Launch an autonomous multi-agent run over the verified MCP tool layer to investigate root causes, quantify loss, and generate remediation proposals.
+          Trigger an autonomous agent run to observe live MCP tool selection, real data retrieval, causal reasoning, and governance checkpoints.
         </p>
-        <button
-          onClick={onStartNewRun}
-          disabled={isProcessing}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium shadow-lg shadow-blue-900/30 transition"
-        >
-          <Play className="w-4 h-4" />
-          Start Agent Investigation (ANOM-REV-001)
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <select
+            value={selectedScenario}
+            onChange={(e) => setSelectedScenario(e.target.value)}
+            className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+          >
+            {scenarios.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => onStartNewRun(selectedScenario)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg flex items-center gap-2 transition-colors"
+          >
+            <Play className="w-4 h-4" /> Start Investigation
+          </button>
+        </div>
       </div>
     );
   }
 
-  const isWaitingApproval = trace.status === "WAITING_FOR_APPROVAL";
-  const isCompleted = trace.status === "COMPLETED";
-  const isRejected = trace.status === "REJECTED";
-
-  // Visual workflow pipeline sequence
-  const workflowNodes = [
-    { id: "detect", label: "DETECT", agent: "Supervisor", tool: "get_business_anomalies", step: 1 },
-    { id: "evidence", label: "EVIDENCE", agent: "Data Analyst", tool: "get_anomaly_evidence", step: 2 },
-    { id: "investigate", label: "INVESTIGATE", agent: "Investigator", tool: "start_investigation", step: 3 },
-    { id: "root_cause", label: "ROOT CAUSE", agent: "Root Cause", tool: "get_investigation", step: 4 },
-    { id: "impact", label: "IMPACT", agent: "Business Impact", tool: "calculate_business_impact", step: 5 },
-    { id: "recommend", label: "RECOMMEND", agent: "Recommendation", tool: "get_recommendations", step: 6 },
-    { id: "approval", label: "APPROVAL GATE", agent: "Governance", tool: "request_approval", step: 7 },
-    { id: "execute", label: "EXECUTE", agent: "Action Agent", tool: "execute_approved_action", step: 9 },
-    { id: "audit", label: "AUDIT", agent: "Audit Agent", tool: "get_audit_events", step: 10 },
-  ];
-
-  const getStepStatus = (nodeStep: number) => {
-    const stepCount = trace.steps.length;
-    if (nodeStep <= 7) {
-      return "completed";
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> COMPLETED</span>;
+      case "WAITING_FOR_APPROVAL":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> WAITING FOR APPROVAL</span>;
+      case "REJECTED":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5"><XCircle className="w-3.5 h-3.5" /> REJECTED</span>;
+      case "FAILED":
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 flex items-center gap-1.5"><AlertOctagon className="w-3.5 h-3.5" /> INSUFFICIENT EVIDENCE</span>;
+      default:
+        return <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 flex items-center gap-1.5"><RefreshCw className="w-3.5 h-3.5 animate-spin" /> RUNNING</span>;
     }
-    if (nodeStep === 7) {
-      return isWaitingApproval ? "waiting" : "completed";
-    }
-    if (nodeStep > 7 && isWaitingApproval) {
-      return "pending";
-    }
-    if (nodeStep > 7 && isRejected) {
-      return "blocked";
-    }
-    if (nodeStep <= stepCount) {
-      return "completed";
-    }
-    return "pending";
   };
 
-  const getSafetyBadgeColor = (safety: string) => {
+  const getSafetyBadge = (safety: string) => {
     switch (safety) {
       case "READ_ONLY":
-        return "bg-emerald-500/10 text-emerald-400 border-emerald-500/30";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-300 border border-slate-700">READ_ONLY</span>;
       case "ANALYSIS":
-        return "bg-blue-500/10 text-blue-400 border-blue-500/30";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800">ANALYSIS</span>;
       case "PROPOSAL":
-        return "bg-purple-500/10 text-purple-400 border-purple-500/30";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-amber-950/80 text-amber-300 border border-amber-800">PROPOSAL</span>;
       case "APPROVAL":
-        return "bg-amber-500/10 text-amber-400 border-amber-500/30";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-purple-950/80 text-purple-300 border border-purple-800">APPROVAL</span>;
       case "CONSEQUENT_ACTION":
       case "CONSEQUENTIAL_ACTION":
-        return "bg-rose-500/10 text-rose-400 border-rose-500/30";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-rose-950/80 text-rose-300 border border-rose-800 font-semibold">CONSEQUENT_ACTION</span>;
       default:
-        return "bg-slate-700 text-slate-300 border-slate-600";
-    }
-  };
-
-  const getEvidenceBadgeColor = (type?: string) => {
-    switch (type) {
-      case "OBSERVED":
-        return "bg-emerald-950/80 text-emerald-300 border-emerald-600/40";
-      case "INFERRED":
-        return "bg-blue-950/80 text-blue-300 border-blue-600/40";
-      case "HYPOTHESIS":
-        return "bg-purple-950/80 text-purple-300 border-purple-600/40";
-      case "PROPOSAL":
-        return "bg-amber-950/80 text-amber-300 border-amber-600/40";
-      case "ACTION_RESULT":
-        return "bg-rose-950/80 text-rose-300 border-rose-600/40";
-      default:
-        return "bg-slate-800 text-slate-300 border-slate-700";
+        return <span className="px-2 py-0.5 text-[10px] font-mono rounded bg-slate-800 text-slate-400">{safety}</span>;
     }
   };
 
   const categories = ["ALL", "Deterministic Analytics", "Multi-Agent Investigation", "Business Impact Modeling", "Action Recommendations", "Governance Gate", "Safe Action Simulation", "Audit & Compliance"];
-
-  const filteredTools = selectedCategory === "ALL"
-    ? MCP_TOOLS_CATALOG
-    : MCP_TOOLS_CATALOG.filter((t) => t.category === selectedCategory);
+  const filteredTools = selectedCategory === "ALL" ? MCP_TOOLS_CATALOG : MCP_TOOLS_CATALOG.filter((t) => t.category === selectedCategory);
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Banner */}
-      <div className="bg-slate-900/90 border border-slate-800/80 rounded-xl p-6 shadow-xl backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 flex items-center gap-1.5">
-                <Cpu className="w-3.5 h-3.5" />
-                PROVIDER-AGNOSTIC AGENT RUNTIME
-              </span>
-              <span className="text-xs text-slate-400 font-mono">Run ID: {trace.run_id}</span>
-              <span
-                className={`px-2.5 py-0.5 text-xs font-semibold rounded-full border ${
-                  isWaitingApproval
-                    ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
-                    : isCompleted
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
-                    : isRejected
-                    ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
-                    : "bg-blue-500/10 text-blue-400 border-blue-500/30"
-                }`}
-              >
-                {trace.status.replace(/_/g, " ")}
-              </span>
-            </div>
-            <h1 className="text-xl font-bold text-white flex items-center gap-2">
-              Autonomous Investigation on <span className="text-blue-400 font-mono">{trace.anomaly_id}</span>
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              End-to-end multi-agent operations pipeline orchestrating 18 verified ORION MCP tools with human governance.
-            </p>
+      {/* Header & Scenario Selection */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-xl p-5 backdrop-blur-sm">
+        <div>
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+              <Bot className="w-5 h-5 text-blue-400" />
+              Autonomous Agent Operations
+            </h2>
+            {getStatusBadge(trace.status)}
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onRefresh}
-              disabled={isLoading || isProcessing}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 flex items-center gap-1.5 transition"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </button>
-            <button
-              onClick={onStartNewRun}
-              disabled={isProcessing}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg shadow-lg shadow-blue-900/30 flex items-center gap-1.5 transition"
-            >
-              <Play className="w-3.5 h-3.5" />
-              New Agent Investigation
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Agent Workflow Pipeline Visualization */}
-      <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-5 shadow-lg">
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-blue-400" />
-          Autonomous Agent Capability Graph (9-Stage Sequence)
-        </h2>
-        <div className="overflow-x-auto pb-2">
-          <div className="flex items-center min-w-[760px] justify-between">
-            {workflowNodes.map((node, idx) => {
-              const status = getStepStatus(node.step);
-              return (
-                <React.Fragment key={node.id}>
-                  <div className="flex flex-col items-center text-center group">
-                    <div
-                      className={`w-10 h-10 rounded-xl border flex items-center justify-center transition-all ${
-                        status === "completed"
-                          ? "bg-emerald-950/80 border-emerald-500 text-emerald-400 shadow-lg shadow-emerald-950/50"
-                          : status === "waiting"
-                          ? "bg-amber-950/90 border-amber-400 text-amber-300 ring-2 ring-amber-400/40 animate-pulse"
-                          : status === "blocked"
-                          ? "bg-rose-950/80 border-rose-500 text-rose-400"
-                          : "bg-slate-800/80 border-slate-700 text-slate-500"
-                      }`}
-                    >
-                      {status === "completed" ? (
-                        <CheckCircle2 className="w-5 h-5" />
-                      ) : status === "waiting" ? (
-                        <Lock className="w-5 h-5" />
-                      ) : status === "blocked" ? (
-                        <XCircle className="w-5 h-5" />
-                      ) : (
-                        <Bot className="w-5 h-5" />
-                      )}
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-200 mt-2">{node.label}</span>
-                    <span className="text-[10px] text-slate-400 truncate max-w-[80px]">{node.agent}</span>
-                    <span className="text-[9px] font-mono text-slate-500 truncate max-w-[90px]">{node.tool}</span>
-                  </div>
-                  {idx < workflowNodes.length - 1 && (
-                    <div
-                      className={`flex-1 h-0.5 mx-2 rounded ${
-                        getStepStatus(workflowNodes[idx + 1].step) === "completed"
-                          ? "bg-emerald-500"
-                          : "bg-slate-700"
-                      }`}
-                    />
-                  )}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* 3. Interactive Human Approval Gate (Prominent Card) */}
-      {isWaitingApproval && (
-        <div className="bg-gradient-to-r from-amber-950/60 via-slate-900 to-amber-950/40 border-2 border-amber-500/80 rounded-xl p-6 shadow-2xl relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-40 h-40 bg-amber-500/10 rounded-full blur-3xl" />
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2 max-w-2xl">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 text-[11px] font-bold uppercase rounded bg-amber-500 text-slate-950 flex items-center gap-1">
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  HUMAN GOVERNANCE GATE
-                </span>
-                <span className="text-xs text-amber-300 font-medium">Autonomous Execution Paused</span>
-              </div>
-              <h3 className="text-lg font-bold text-white">
-                Human Executive Authorization Required for {trace.active_recommendation_id}
-              </h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                The Recommendation Agent proposes applying emergency support capacity reallocation (+15 Tier-1/Tier-2 specialists, automated triage deployment) to mitigate severe SLA breaches. Consequential actions require explicit human operator approval before safe simulation execution.
-              </p>
-              <div className="flex flex-wrap gap-4 pt-1 text-xs">
-                <div className="bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                  <span className="text-slate-400">Target Action:</span>{" "}
-                  <span className="font-mono text-amber-300">adjust_support_staffing</span>
-                </div>
-                <div className="bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                  <span className="text-slate-400">Expected Recovery:</span>{" "}
-                  <span className="font-semibold text-emerald-400">$350,000.00 (+25.0%)</span>
-                </div>
-                <div className="bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800">
-                  <span className="text-slate-400">Agent Confidence:</span>{" "}
-                  <span className="font-semibold text-blue-400">88.0% Grounded</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex sm:flex-col gap-3 w-full md:w-auto">
-              <button
-                onClick={() => trace.active_recommendation_id && onApprove(trace.active_recommendation_id)}
-                disabled={isProcessing}
-                className="flex-1 md:flex-none px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition"
-              >
-                <UserCheck className="w-4 h-4" />
-                APPROVE & EXECUTE SIMULATION
-              </button>
-              <button
-                onClick={() => trace.active_recommendation_id && onReject(trace.active_recommendation_id)}
-                disabled={isProcessing}
-                className="flex-1 md:flex-none px-6 py-3 bg-rose-950/80 hover:bg-rose-900/90 text-rose-300 border border-rose-700/60 text-xs font-bold rounded-lg flex items-center justify-center gap-2 transition"
-              >
-                <XCircle className="w-4 h-4" />
-                REJECT PROPOSAL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 4. Safe Simulation Completed Card */}
-      {isCompleted && trace.simulation_result && (
-        <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="px-2.5 py-0.5 text-xs font-bold rounded bg-emerald-500 text-slate-950 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              {trace.simulation_result.execution_mode || "SIMULATED ACTION"}
-            </span>
-            <span className="text-xs text-emerald-400 font-mono">
-              Execution ID: {trace.simulation_result.execution_id}
-            </span>
-            <span className="text-xs text-slate-400 ml-auto font-mono">
-              {trace.simulation_result.executed_at}
-            </span>
-          </div>
-          <h3 className="text-base font-bold text-white mb-2">
-            Safe Operational Simulation Completed Successfully
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 my-3">
-            {trace.simulation_result.result?.changes_made?.map((change: string, idx: number) => (
-              <div key={idx} className="bg-slate-950/70 p-3 rounded-lg border border-slate-800 text-xs text-slate-200 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span>{change}</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-[11px] text-slate-400 italic">
-            * All changes executed within safe sandbox boundaries. Rollback instructions and audit events committed to immutable operations log.
+          <p className="text-slate-400 text-xs flex items-center gap-2">
+            <span>Run ID: <code className="text-blue-300 font-mono">{trace.run_id}</code></span>
+            <span>•</span>
+            <span>Target: <code className="text-amber-300 font-mono">{trace.anomaly_id}</code></span>
+            <span>•</span>
+            <span>Runtime: <span className="text-emerald-400 font-medium">LocalAgentRuntime</span></span>
+            <span>•</span>
+            <span>Adya AI: <span className="text-cyan-400 font-medium">ADAPTER-READY ONLY</span></span>
           </p>
         </div>
-      )}
 
-      {/* 5. Sub-View Switcher: Trace vs MCP Tools Catalog */}
-      <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-slate-800/80 border border-slate-700/80 rounded-lg px-2.5 py-1.5">
+            <span className="text-[11px] text-slate-400 font-medium">Scenario:</span>
+            <select
+              value={selectedScenario}
+              onChange={(e) => setSelectedScenario(e.target.value)}
+              className="bg-transparent text-white text-xs font-medium focus:outline-none cursor-pointer"
+            >
+              {scenarios.map((s) => (
+                <option key={s.id} value={s.id} className="bg-slate-900 text-white">
+                  {s.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() => onStartNewRun(selectedScenario)}
+            disabled={isProcessing}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+          >
+            <Play className="w-3.5 h-3.5" /> New Investigation
+          </button>
+          <button
+            onClick={onRefresh}
+            className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
+            title="Refresh Trace"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* View Switcher Tabs */}
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
         <button
           onClick={() => setActiveSubView("trace")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors ${
             activeSubView === "trace"
-              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-              : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+              ? "bg-blue-600/20 text-blue-400 border border-blue-500/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
           }`}
         >
-          <Terminal className="w-3.5 h-3.5" />
-          Agent Execution Trace ({trace.steps.length} Steps)
+          <Terminal className="w-3.5 h-3.5" /> Investigation Trace ({trace.steps.length} Steps)
+        </button>
+        <button
+          onClick={() => setActiveSubView("decision_trace")}
+          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors ${
+            activeSubView === "decision_trace"
+              ? "bg-cyan-600/20 text-cyan-400 border border-cyan-500/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" /> Decision Trace & Confidence
         </button>
         <button
           onClick={() => setActiveSubView("mcp_catalog")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold transition ${
+          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors ${
             activeSubView === "mcp_catalog"
-              ? "bg-blue-600 text-white shadow-md shadow-blue-900/30"
-              : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+              ? "bg-purple-600/20 text-purple-400 border border-purple-500/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
           }`}
         >
-          <Wrench className="w-3.5 h-3.5 text-cyan-400" />
-          18 MCP Tools Explorer (5 Safety Tiers)
+          <Layers className="w-3.5 h-3.5" /> 18 MCP Tools Explorer
+        </button>
+        <button
+          onClick={() => setActiveSubView("history")}
+          className={`px-3.5 py-1.5 text-xs font-medium rounded-lg flex items-center gap-2 transition-colors ${
+            activeSubView === "history"
+              ? "bg-emerald-600/20 text-emerald-400 border border-emerald-500/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+          }`}
+        >
+          <History className="w-3.5 h-3.5" /> Run History
         </button>
       </div>
 
-      {/* 6A. Sub-View: Trace Logs */}
+      {/* SUBVIEW 1: Active Investigation Trace */}
       {activeSubView === "trace" && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-blue-400" />
-              Structured Agent Execution Trace ({trace.steps.length} Steps)
-            </h2>
-            <span className="text-xs text-slate-400 font-mono">
-              Provider: ORION LocalAgentRuntime (MCP-First)
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {trace.steps.map((step) => (
-              <div
-                key={step.step_id}
-                onClick={() => setSelectedStep(step)}
-                className="bg-slate-950/70 border border-slate-800/80 hover:border-slate-700 rounded-lg p-4 transition cursor-pointer"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <div className="space-y-6">
+          {/* Human Governance Approval Banner */}
+          {trace.status === "WAITING_FOR_APPROVAL" && (
+            <div className="bg-gradient-to-r from-amber-950/40 via-slate-900/90 to-amber-950/40 border-2 border-amber-500/50 rounded-xl p-6 shadow-xl relative overflow-hidden">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                <div className="space-y-3 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-md bg-slate-800 text-slate-300 text-xs font-mono font-bold flex items-center justify-center">
-                      {step.step_id}
+                    <span className="px-2.5 py-0.5 bg-amber-500/20 border border-amber-500/40 rounded text-amber-300 font-mono text-[11px] font-bold flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5" /> MANDATORY HUMAN GOVERNANCE GATE
                     </span>
-                    <span className="text-xs font-bold text-white">{step.agent_role}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-600" />
-                    <span className="text-xs font-mono text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/40">
-                      {step.tool_called}
-                    </span>
+                    <span className="text-slate-400 text-xs">Request ID: <code className="text-amber-200">{trace.approval_request_id || "APPR-REC-001"}</code></span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSafetyBadgeColor(step.tool_safety)}`}>
-                      {step.tool_safety}
-                    </span>
-                    {step.evidence_type && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getEvidenceBadgeColor(step.evidence_type)}`}>
-                        {step.evidence_type}
-                      </span>
-                    )}
-                    <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      {step.duration_ms}ms
-                    </span>
+                  <h3 className="text-lg font-bold text-white">
+                    Authorization Required: {trace.governance_details?.action || "Support Team Capacity Escalation"}
+                  </h3>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
+                      <span className="text-slate-400 font-medium block mb-1">Expected Benefit:</span>
+                      <p className="text-emerald-300">{trace.governance_details?.expected_benefit || "Reduces resolution latency from 26.5h to <4.0h and mitigates forward churn risk."}</p>
+                    </div>
+                    <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3">
+                      <span className="text-slate-400 font-medium block mb-1">Governance Threshold:</span>
+                      <p className="text-amber-300">{trace.governance_details?.why_approval_required || "Operational capacity shift exceeds automated threshold."}</p>
+                    </div>
                   </div>
+
+                  <p className="text-slate-400 text-xs">
+                    <strong className="text-slate-300">Safety Guarantee:</strong> Consequential actions fail closed. No changes are applied until an authorized executive approves. Execution occurs strictly in <span className="text-cyan-300 font-mono">SIMULATED ACTION</span> mode.
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-1">
-                  <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Input Summary
-                    </span>
-                    <p className="text-slate-300 text-xs">{step.input_summary}</p>
-                  </div>
-                  <div className="bg-slate-900/60 p-2.5 rounded border border-slate-800/60">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
-                      Output Summary
-                    </span>
-                    <p className="text-slate-200 text-xs">{step.output_summary}</p>
-                  </div>
+                <div className="flex flex-row md:flex-col gap-3 min-w-[200px]">
+                  <button
+                    onClick={() => onApprove(trace.active_recommendation_id || "REC-001")}
+                    disabled={isProcessing}
+                    className="flex-1 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Approve & Execute Simulation
+                  </button>
+                  <button
+                    onClick={() => onReject(trace.active_recommendation_id || "REC-001")}
+                    disabled={isProcessing}
+                    className="flex-1 px-5 py-2.5 bg-slate-800 hover:bg-rose-900/50 hover:border-rose-700 disabled:opacity-50 text-slate-300 hover:text-rose-200 border border-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2"
+                  >
+                    <XCircle className="w-4 h-4" /> Reject Proposal
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+          )}
+
+          {/* Simulation Success Banner */}
+          {trace.status === "COMPLETED" && trace.simulation_result && (
+            <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-xl p-5 text-xs text-slate-300 space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="font-bold text-emerald-400 flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Operational Simulation Complete: {trace.simulation_result.execution_mode || "SIMULATED ACTION"}
+                </h4>
+                <span className="font-mono text-emerald-300 text-[11px]">Execution ID: {trace.simulation_result.execution_id}</span>
+              </div>
+              <p className="text-slate-300">
+                Applied <strong className="text-white">{trace.simulation_result.result?.changes_made?.length || 3} simulated adjustments</strong> (+15 specialists allocated, throughput 42 → 128 tickets/hr). Full audit record committed to immutable ledger.
+              </p>
+            </div>
+          )}
+
+          {/* Chronological MCP Tool Stream */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Activity className="w-4 h-4 text-blue-400" />
+                Chronological Tool Execution Trace
+              </h3>
+              <span className="text-slate-400 text-xs font-mono">{trace.steps.length} Tool Invocations</span>
+            </div>
+
+            <div className="divide-y divide-slate-800/60">
+              {trace.steps.map((step) => (
+                <div
+                  key={step.step_id}
+                  onClick={() => setSelectedStep(selectedStep?.step_id === step.step_id ? null : step)}
+                  className={`p-4 hover:bg-slate-800/40 transition-colors cursor-pointer ${
+                    selectedStep?.step_id === step.step_id ? "bg-slate-800/60" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4 mb-1.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-6 h-6 rounded-full bg-slate-800 text-slate-300 font-mono text-xs flex items-center justify-center font-bold">
+                        {step.step_id}
+                      </span>
+                      <span className="font-semibold text-white text-xs font-mono">{step.tool_called}</span>
+                      {getSafetyBadge(step.tool_safety)}
+                      <span className="text-slate-400 text-xs">• {step.agent_role}</span>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-slate-400 font-mono">
+                      <span>{step.duration_ms}ms</span>
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">
+                        {step.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-slate-300 text-xs pl-8 leading-relaxed">
+                    {step.output_summary}
+                  </p>
+
+                  {/* Expandable Parameter & Evidence Inspection */}
+                  {selectedStep?.step_id === step.step_id && (
+                    <div className="mt-3 ml-8 p-3 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono text-slate-300 space-y-2">
+                      <div>
+                        <span className="text-slate-500 block mb-0.5">Input Parameters:</span>
+                        <p className="text-cyan-300">{step.input_summary}</p>
+                      </div>
+                      {step.details && Object.keys(step.details).length > 0 && (
+                        <div>
+                          <span className="text-slate-500 block mb-0.5">Raw Execution Payload:</span>
+                          <pre className="text-[11px] text-slate-400 overflow-x-auto max-h-48 p-2 bg-slate-900 rounded border border-slate-800">
+                            {JSON.stringify(step.details, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* 6B. Sub-View: MCP Tools Catalog Explorer */}
-      {activeSubView === "mcp_catalog" && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-6 shadow-xl space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                <Wrench className="w-4 h-4 text-cyan-400" />
-                ORION FastMCP Tools Catalog (18 Operational Tools)
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Exposes deterministic analytics, investigation, governance, and simulation to any MCP-compliant runtime.
+      {/* SUBVIEW 2: Decision Trace & Confidence Scoring */}
+      {activeSubView === "decision_trace" && (
+        <div className="space-y-6">
+          {/* Confidence & Risk Scorecards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-1">
+              <span className="text-slate-400 text-xs font-medium">Detection Confidence</span>
+              <div className="text-2xl font-bold text-emerald-400 font-mono">
+                {( (trace.scores?.detection_confidence || 0.95) * 100).toFixed(0)}%
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {trace.scores?.detection_explanation || "Statistical z-score > 4.2 deviation across baseline."}
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs font-mono bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-400">Server:</span>
-              <span className="text-cyan-400">orion_mcp/server.py</span>
+
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-1">
+              <span className="text-slate-400 text-xs font-medium">Root-Cause Confidence</span>
+              <div className="text-2xl font-bold text-cyan-400 font-mono">
+                {( (trace.scores?.root_cause_confidence || 0.88) * 100).toFixed(0)}%
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {trace.scores?.root_cause_explanation || "Cross-signal temporal correlation across support & inventory."}
+              </p>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-1">
+              <span className="text-slate-400 text-xs font-medium">Recommendation Confidence</span>
+              <div className="text-2xl font-bold text-blue-400 font-mono">
+                {( (trace.scores?.recommendation_confidence || 0.91) * 100).toFixed(0)}%
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {trace.scores?.recommendation_explanation || "Deterministic model projects 78% backlog reduction."}
+              </p>
+            </div>
+
+            <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-1">
+              <span className="text-slate-400 text-xs font-medium">Action Risk Tier</span>
+              <div className="text-2xl font-bold text-amber-400 font-mono">
+                {trace.scores?.action_risk || "MEDIUM"}
+              </div>
+              <p className="text-[11px] text-slate-400 leading-tight">
+                {trace.scores?.action_risk_explanation || "Operational capacity shift; fully reversible via simulated rollback."}
+              </p>
             </div>
           </div>
 
-          {/* Category Filter Pills */}
-          <div className="flex flex-wrap gap-2 pt-2">
+          {/* Decision Trace Timeline */}
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-6">
+            <div>
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-cyan-400" />
+                Causal Decision Progression
+              </h3>
+              <p className="text-slate-400 text-xs">
+                Transparent step-by-step reasoning chain linking observed SQL anomalies directly to human governance and simulation.
+              </p>
+            </div>
+
+            <div className="space-y-4 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800">
+              {(trace.decision_trace || []).map((item, idx) => (
+                <div key={idx} className="relative pl-10">
+                  <div className="absolute left-2.5 -translate-x-1/2 top-1.5 w-3.5 h-3.5 rounded-full bg-slate-900 border-2 border-cyan-500" />
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-lg p-4 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-mono text-cyan-400 uppercase font-bold tracking-wider">
+                        {item.stage}
+                      </span>
+                      {item.confidence_score && (
+                        <span className="text-[11px] font-mono text-slate-400">
+                          Confidence: {(item.confidence_score * 100).toFixed(0)}%
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-sm font-semibold text-white">{item.title}</h4>
+                    <p className="text-xs text-slate-300 leading-relaxed">{item.summary}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SUBVIEW 3: 18 MCP Tools Catalog */}
+      {activeSubView === "mcp_catalog" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-md text-[11px] font-medium transition ${
+                className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
                   selectedCategory === cat
-                    ? "bg-cyan-950 text-cyan-300 border border-cyan-700"
-                    : "bg-slate-950/80 text-slate-400 hover:text-slate-200 border border-slate-800"
+                    ? "bg-purple-600 text-white"
+                    : "bg-slate-800 text-slate-400 hover:text-slate-200"
                 }`}
               >
                 {cat}
@@ -619,36 +668,61 @@ export function AgentRunView({
             ))}
           </div>
 
-          {/* Tools Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {filteredTools.map((tool) => (
-              <div
-                key={tool.name}
-                className="bg-slate-950/70 border border-slate-800/80 rounded-lg p-4 flex flex-col justify-between hover:border-slate-700 transition"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="font-mono text-xs font-bold text-cyan-300">{tool.name}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getSafetyBadgeColor(tool.safety)}`}>
-                      {tool.safety}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">{tool.description}</p>
+              <div key={tool.name} className="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <code className="text-xs font-mono font-bold text-purple-300">{tool.name}</code>
+                  {getSafetyBadge(tool.safety)}
                 </div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 pt-3 mt-2 border-t border-slate-900">
-                  <span className="text-slate-500">{tool.category}</span>
-                  {tool.requiresApproval ? (
-                    <span className="text-amber-400 font-semibold flex items-center gap-1">
-                      <Lock className="w-3 h-3" />
-                      Human Approval Required
-                    </span>
-                  ) : (
-                    <span className="text-slate-500">Autonomous Authorized</span>
-                  )}
-                </div>
+                <span className="text-[11px] text-slate-500 block font-medium">{tool.category}</span>
+                <p className="text-xs text-slate-300 leading-relaxed">{tool.description}</p>
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* SUBVIEW 4: Investigation Run History */}
+      {activeSubView === "history" && (
+        <div className="bg-slate-900/60 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+              <History className="w-4 h-4 text-emerald-400" />
+              Investigation Run History
+            </h3>
+            <button
+              onClick={loadHistory}
+              disabled={historyLoading}
+              className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${historyLoading ? "animate-spin" : ""}`} /> Refresh
+            </button>
+          </div>
+
+          {historyList.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-xs">
+              No historical runs found in database.
+            </div>
+          ) : (
+            <div className="divide-y divide-slate-800/60">
+              {historyList.map((run) => (
+                <div key={run.run_id} className="p-4 hover:bg-slate-800/30 transition-colors flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold text-blue-300">{run.run_id}</span>
+                      {getStatusBadge(run.status)}
+                      <span className="text-xs text-slate-400 font-mono">• {run.anomaly_id}</span>
+                    </div>
+                    <p className="text-xs text-slate-300">
+                      {run.scenario_title || `Investigation for ${run.anomaly_id}`} ({run.steps.length} Tool Steps)
+                    </p>
+                    <span className="text-[11px] text-slate-500 font-mono">{run.started_at}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

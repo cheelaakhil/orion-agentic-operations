@@ -168,5 +168,7 @@ export const api = {
   // MCP Tools & Runtime Info
   getRuntimeInfo: () => fetcher<any>("/agent-run/runtime-info"),
   getMcpTools: () => fetcher<{ tools: any[]; count: number }>("/agent-run/mcp-tools"),
+  getAgentRunScenarios: () => fetcher<{ scenarios: any[]; count: number }>("/agent-run/scenarios"),
+  getAgentRunHistory: () => fetcher<any[]>("/agent-run/history"),
 };
 

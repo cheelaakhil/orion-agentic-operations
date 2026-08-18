@@ -396,3 +396,7 @@ class AdyaAgentRuntime(AgentRuntimeProvider):
 
     def get_run_trace(self, run_id: str) -> Optional[AgentRunTrace]:
         return self._runs.get(run_id)
+
+    def get_all_runs(self) -> list[AgentRunTrace]:
+        return sorted(list(self._runs.values()), key=lambda r: r.started_at, reverse=True)
+

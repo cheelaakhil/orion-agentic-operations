@@ -160,6 +160,45 @@ export interface HealthCheckResponse {
   version: string;
 }
 
+export interface DecisionTraceItem {
+  stage: string;
+  title: string;
+  summary: string;
+  confidence_score?: number;
+  risk_level?: string;
+}
+
+export interface ConfidenceScores {
+  detection_confidence: number;
+  detection_explanation: string;
+  root_cause_confidence: number;
+  root_cause_explanation: string;
+  recommendation_confidence: number;
+  recommendation_explanation: string;
+  action_risk: string;
+  action_risk_explanation: string;
+}
+
+export interface GovernanceDetails {
+  action: string;
+  risk_level: string;
+  affected_system: string;
+  affected_scope: string;
+  parameters: Record<string, any>;
+  expected_benefit: string;
+  potential_risk: string;
+  why_approval_required: string;
+}
+
+export interface InvestigationScenario {
+  id: string;
+  title: string;
+  metric: string;
+  severity: string;
+  category: string;
+  description: string;
+}
+
 export interface AgentTraceStep {
   step_id: number;
   timestamp: string;
@@ -177,10 +216,14 @@ export interface AgentTraceStep {
 export interface AgentRunTrace {
   run_id: string;
   anomaly_id: string;
+  scenario_title?: string;
   status: string;
   started_at: string;
   completed_at?: string;
   steps: AgentTraceStep[];
+  decision_trace?: DecisionTraceItem[];
+  scores?: ConfidenceScores;
+  governance_details?: GovernanceDetails;
   active_recommendation_id?: string;
   approval_request_id?: string;
   approval_status?: string;

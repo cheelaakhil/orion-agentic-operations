@@ -209,6 +209,54 @@ def start_agent_run(req: StartAgentRunRequest):
         raise HTTPException(status_code=500, detail=f"Failed to start agent run: {str(e)}")
 
 
+AVAILABLE_SCENARIOS = [
+    {
+        "id": "ANOM-REV-001",
+        "title": "Revenue Drop (-43.01%)",
+        "metric": "daily_revenue",
+        "severity": "CRITICAL",
+        "category": "Financial Performance",
+        "description": "Severe post-June 20 decline in enterprise sales volume with elevated support ticket backlog.",
+    },
+    {
+        "id": "ANOM-SUP-002",
+        "title": "Support Backlog Surge (SLA Breach 86.7%)",
+        "metric": "sla_breach_rate",
+        "severity": "HIGH",
+        "category": "Customer Operations",
+        "description": "Resolution time surge to 26.5h across Tier-2 technical support escalations.",
+    },
+    {
+        "id": "ANOM-INV-003",
+        "title": "Warehouse Stockout Surge (Electronics 19.8%)",
+        "metric": "stockout_rate",
+        "severity": "HIGH",
+        "category": "Supply Chain & Logistics",
+        "description": "Critical inventory depletion across high-velocity Electronics SKUs in North America hub.",
+    },
+    {
+        "id": "ANOM-CUST-004",
+        "title": "Customer Churn Acceleration (Repeat Rate -54.3%)",
+        "metric": "repeat_purchase_rate",
+        "severity": "MEDIUM",
+        "category": "Customer Retention",
+        "description": "Drop in repeat buyer retention among second-month purchase cohorts.",
+    },
+]
+
+
+@router.get("/scenarios")
+def get_investigation_scenarios():
+    """Returns available operational anomaly scenarios mapped to database records."""
+    return {"scenarios": AVAILABLE_SCENARIOS, "count": len(AVAILABLE_SCENARIOS)}
+
+
+@router.get("/history", response_model=list[AgentRunTrace])
+def get_agent_run_history():
+    """Retrieves all historical agent runs in reverse chronological order."""
+    return global_agent_runtime.get_all_runs()
+
+
 @router.get("/latest", response_model=Optional[AgentRunTrace])
 def get_latest_agent_run():
     """Retrieves the most recent agent run trace."""

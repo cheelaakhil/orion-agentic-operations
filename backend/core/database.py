@@ -53,3 +53,40 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def init_db_if_needed(engine=None) -> bool:
+    """
+    Idempotent database initializer for production cloud deployments (e.g. Render Free).
+    - Creates tables if they do not exist.
+    - Seeds the NovaCart demo dataset if the database is unpopulated.
+    - Skips cleanly if data is already present.
+    Returns True if seeding occurred, False if skipped.
+    """
+    eng = engine or sync_engine
+    
+    # 1. Create tables if not present
+    from backend.models.models import Base, Customer, Product
+    Base.metadata.create_all(bind=eng)
+
+    # 2. Check if records already exist
+    SessionMaker = sessionmaker(autocommit=False, autoflush=False, bind=eng)
+    with SessionMaker() as session:
+        try:
+            prod_count = session.query(Product).count()
+            cust_count = session.query(Customer).count()
+            if prod_count > 0 and cust_count > 0:
+                print(f"[INFO] Database already initialized ({prod_count} products, {cust_count} customers). Skipping seed.")
+                return False
+        except Exception as e:
+            print(f"[WARN] Error checking table counts: {e}")
+
+        # 3. Seed dataset if empty
+        print("[*] Unpopulated database detected. Auto-seeding NovaCart dataset for cloud deployment...")
+        from data.generate import NovaCartDataGenerator
+        generator = NovaCartDataGenerator(session)
+        generator.generate_all()
+        session.commit()
+        print("[✓] NovaCart dataset auto-seeding committed successfully.")
+        return True
+

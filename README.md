@@ -164,6 +164,7 @@ cd frontend && npm install && cd ..
 ```bash
 python -m data.generate
 ```
+*(Note: On cloud deployments such as Render Free, database schema creation and NovaCart data seeding execute automatically on application startup).*
 
 ### 3. Start Backend API
 ```bash

@@ -57,17 +57,13 @@
    | `ORION_AGENT_PROVIDER` | `local` |
 5. Click **Deploy Web Service**.
 
----
+### Step C: Automatic Database Initialization & Seeding
 
-### Step C: Initialize & Seed Database
-
-Once the Render backend service is provisioned:
-
-1. Open the Render **Shell** tab on your backend service (or run locally with the remote `DATABASE_URL`):
-   ```bash
-   python -m data.generate
-   ```
-2. This generates the 52,000+ record NovaCart business operations dataset with 90 days of synthetic transactions, ticket logs, stockout events, and the engineered anomaly incident.
+**No Shell Access Needed**: Because Render Free tier does not include interactive shell access, ORION features an **automated, idempotent database initializer** in `backend/core/database.py` that executes during the FastAPI application startup (`lifespan` hook):
+1. Detects connected PostgreSQL database via `DATABASE_URL`.
+2. Creates all schema tables if they do not exist.
+3. Automatically seeds the 52,000+ record NovaCart business operations dataset on first boot.
+4. On subsequent restarts/redeployments, it detects existing records and skips seeding instantaneously with zero overhead.
 
 ---
 

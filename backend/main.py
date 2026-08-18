@@ -20,11 +20,17 @@ from backend.api.audit import router as audit_router
 from backend.api.investigations import router as investigations_router
 from backend.api.recommendations import router as recommendations_router
 from backend.core.config import settings
+from backend.core.database import init_db_if_needed
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan: startup and shutdown hooks."""
+    # Initialize schema & seed NovaCart demo dataset if database is unpopulated (for cloud deployments like Render)
+    try:
+        init_db_if_needed()
+    except Exception as e:
+        print(f"[WARN] Database initialization warning on startup: {e}")
     yield
 
 

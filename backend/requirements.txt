@@ -6,6 +6,9 @@ uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.1
 
+# Model Context Protocol (MCP) SDK
+mcp>=1.0.0,<=1.26.0
+
 # Database
 sqlalchemy==2.0.36
 asyncpg==0.30.0
@@ -19,6 +22,7 @@ pandas==2.2.3
 
 # HTTP & async
 httpx==0.28.1
+sse-starlette>=2.0.0
 
 # Testing
 pytest==8.3.4
